@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Python packaging/test artifacts (sdlc-*-agent)
+.pytest_cache/
+*.egg-info/
+.venv/
+build/
+dist/
