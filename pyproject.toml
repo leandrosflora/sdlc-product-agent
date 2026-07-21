@@ -2,7 +2,13 @@
 name = "sdlc-product-agent"
 version = "0.1.0"
 description = "Operational agent implementing agent_role == \"product\" from the agentic-sdlc-reference-architecture."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
+dependencies = [
+  "agentic-sdlc-runtime @ git+https://github.com/leandrosflora/agentic-sdlc-runtime.git@master"
+]
+
+[project.scripts]
+sdlc-product-issue = "sdlc_product_agent.github_issue:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
