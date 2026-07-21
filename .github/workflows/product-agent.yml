@@ -1,0 +1,107 @@
+name: Product Agent
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Existing issue number
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: product-agent-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: true
+
+jobs:
+  refine:
+    if: github.event_name == 'workflow_dispatch' || github.event.action != 'labeled' || github.event.label.name == 'agentic-sdlc'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout canonical policy
+        uses: actions/checkout@v4
+        with:
+          repository: leandrosflora/agentic-sdlc-reference-architecture
+          path: reference
+          sparse-checkout: policies
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+
+      - name: Install Product Agent and shared runtime
+        run: pip install .
+
+      - name: Resolve workflow-dispatch issue
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          request = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPOSITORY']}/issues/{os.environ['ISSUE_NUMBER']}",
+              headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}", "Accept": "application/vnd.github+json"},
+          )
+          with urllib.request.urlopen(request) as response:
+              issue = json.load(response)
+          payload = {"issue": issue, "repository": {"full_name": os.environ["REPOSITORY"]}}
+          open("/tmp/issue-event.json", "w").write(json.dumps(payload))
+          PY
+
+      - name: Copy issue event
+        if: github.event_name == 'issues'
+        run: cp "$GITHUB_EVENT_PATH" /tmp/issue-event.json
+
+      - name: Generate criteria and evidence
+        env:
+          SDLC_POLICY_PATH: ${{ github.workspace }}/reference/policies/agent_authorization.rego
+          MODEL_BASE_URL: ${{ secrets.MODEL_BASE_URL }}
+          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+          MODEL_NAME: ${{ secrets.MODEL_NAME }}
+        run: |
+          python -m sdlc_product_agent.github_issue             --event /tmp/issue-event.json             --summary /tmp/product-agent-summary.json             --comment /tmp/product-agent-comment.md
+
+      - name: Create or update Issue comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- agentic-sdlc-product-agent -->';
+            const body = fs.readFileSync('/tmp/product-agent-comment.md', 'utf8');
+            const issue_number = context.eventName === 'workflow_dispatch'
+              ? Number('${{ inputs.issue_number }}')
+              : context.issue.number;
+            const { owner, repo } = context.repo;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const previous = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: previous.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Publish evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-agent-evidence-${{ github.event.issue.number || inputs.issue_number }}
+          path: |
+            .runtime/evidence/
+            .runtime/events/
+            .runtime/checkpoints/
+            /tmp/product-agent-summary.json
+          retention-days: 90
