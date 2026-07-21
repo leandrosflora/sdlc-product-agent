@@ -1,22 +1,78 @@
-# sdlc-product-agent
+# SDLC Product Agent
 
-Agente `product` do [agentic-sdlc-reference-architecture](https://github.com/leandrosflora/agentic-sdlc-reference-architecture) — implementação operacional do papel `agent_role == "product"` definido em `policies/agent_authorization.rego`.
+Primeiro agente funcional da [Agentic SDLC Reference Architecture](https://github.com/leandrosflora/agentic-sdlc-reference-architecture), executado pelo [Agentic SDLC Runtime](https://github.com/leandrosflora/agentic-sdlc-runtime).
 
-## Responsabilidade
+## Fluxo implementado
 
-Define e mantém requisitos e critérios de aceitação verificáveis; dono do **Definition gate** (requisito, critérios verificáveis, owner, dados, risco e `change_id`).
+~~~text
+GitHub Issue
+→ autorização OPA requirements.update
+→ Context Builder
+→ Product Agent
+→ critérios de aceite estruturados
+→ comentário idempotente no Issue
+→ event + evidence bundle
+~~~
 
-## Autorização (OPA)
+## Comportamento
 
-- `project.read`: permitido, restrito ao próprio `project_id`.
-- `requirements.update`: permitido, restrito ao próprio `project_id` e a `change.risk` em `{R0, R1}` (Definition gate).
-- Sem permissão para escrever código de aplicação, alterar arquitetura/contratos ou acionar deploy.
+Ao abrir ou editar um Issue, o workflow Product Agent:
 
-## Status
+1. valida título, corpo, número e repositório;
+2. cria um change_id determinístico;
+3. consulta a policy canônica pelo OPA;
+4. trata o conteúdo do Issue como contexto não confiável;
+5. usa o Model Gateway configurado ou o modelo fake;
+6. exige acceptance_criteria como lista não vazia;
+7. publica checklist no Issue;
+8. persiste contexto, saída, evento e checkpoint;
+9. publica o evidence bundle como artifact por 90 dias.
 
-Scaffold inicial (Python/.pyproj). Lógica do agente ainda não implementada.
+O comentário contém um marker e é atualizado em novas execuções, evitando duplicação.
+
+## Model Gateway
+
+Sem secrets, o workflow usa o Fake Model Gateway determinístico. Para usar um endpoint OpenAI-compatible, configure no repositório:
+
+- MODEL_BASE_URL
+- MODEL_API_KEY
+- MODEL_NAME
+
+As credenciais não entram no prompt nem nas evidências.
+
+## Execução manual
+
+O workflow também aceita workflow_dispatch com o número de um Issue existente.
+
+Localmente:
+
+~~~bash
+pip install -e ".[dev]"
+python -m sdlc_product_agent.github_issue \
+  --event event.json \
+  --summary product-agent-summary.json \
+  --comment product-agent-comment.md
+~~~
+
+É necessário ter OPA no PATH e definir SDLC_POLICY_PATH para a policy canônica.
+
+## Autorização
+
+- project.read: próprio project_id;
+- requirements.update: Product Agent, mesmo project_id e risco R0/R1;
+- sem escrita em código, arquitetura ou produção.
+
+## Evidências
+
+~~~text
+.runtime/
+├── checkpoints/<change_id>/product.json
+├── evidence/<change_id>/<run_id>/
+└── events/<change_id>/
+~~~
 
 ## Referências
 
-- Governança e gates: [docs/governance.md](https://github.com/leandrosflora/agentic-sdlc-reference-architecture/blob/main/docs/governance.md)
-- Política: [policies/agent_authorization.rego](https://github.com/leandrosflora/agentic-sdlc-reference-architecture/blob/main/policies/agent_authorization.rego)
+- [Runtime compartilhado](https://github.com/leandrosflora/agentic-sdlc-runtime)
+- [Governança](https://github.com/leandrosflora/agentic-sdlc-reference-architecture/blob/main/docs/governance.md)
+- [Policy OPA](https://github.com/leandrosflora/agentic-sdlc-reference-architecture/blob/main/policies/agent_authorization.rego)
