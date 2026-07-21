@@ -1,0 +1,10 @@
+{
+  "action": "project.read",
+  "identity": {
+    "agent_role": "product",
+    "project_id": "example-project"
+  },
+  "resource": {
+    "project_id": "other-project"
+  }
+}
