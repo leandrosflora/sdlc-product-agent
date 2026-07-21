@@ -9,7 +9,7 @@ Define e mantém requisitos e critérios de aceitação verificáveis; dono do *
 ## Autorização (OPA)
 
 - `project.read`: permitido, restrito ao próprio `project_id`.
-- Alteração de requisitos: prevista na matriz de capacidades do governance; ainda não codificada como regra própria em `agent_authorization.rego` (hoje só `project.read` é avaliado para este papel).
+- `requirements.update`: permitido, restrito ao próprio `project_id` e a `change.risk` em `{R0, R1}` (Definition gate).
 - Sem permissão para escrever código de aplicação, alterar arquitetura/contratos ou acionar deploy.
 
 ## Status

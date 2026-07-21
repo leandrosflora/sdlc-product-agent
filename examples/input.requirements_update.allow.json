@@ -1,0 +1,6 @@
+{
+  "action": "requirements.update",
+  "identity": {"agent_role": "product", "project_id": "example-project"},
+  "resource": {"project_id": "example-project"},
+  "change": {"risk": "R1"}
+}
