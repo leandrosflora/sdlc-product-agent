@@ -56,6 +56,13 @@ python -m sdlc_product_agent.github_issue \
 
 É necessário ter OPA no PATH e definir SDLC_POLICY_PATH para a policy canônica.
 
+A dependência `agentic-sdlc-runtime` é instalada da tag versionada no GitHub. Para
+desenvolver contra o checkout irmão local em vez da tag:
+
+~~~bash
+pip install -e ../agentic-sdlc-runtime
+~~~
+
 ## Autorização
 
 - project.read: próprio project_id;
